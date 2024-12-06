@@ -7,6 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.naive_bayes import MultinomialNB
+import bcrypt
 
 # Database connection function with caching
 @st.cache_resource
@@ -36,28 +37,29 @@ if 'profile_pic' not in st.session_state:
     st.session_state['profile_pic'] = "/Users/aaditya/Desktop/ML_Project copy/a.webp"
 
 # User functions
-def login(username, password):
-    with conn:
-        user = conn.execute('SELECT * FROM users WHERE username=? AND password=?', (username, password)).fetchone()
-        if user:
-            st.session_state['username'] = username
-            st.session_state['profile_pic'] = user[2] if user[2] else "/Users/aaditya/Desktop/ML_Project copy/a.webp"
-            return True
-    return False
-
 def signup(username, password, profile_pic):
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     try:
         with conn:
             conn.execute('INSERT INTO users (username, password, profile_pic) VALUES (?, ?, ?)', 
-                         (username, password, profile_pic))
+                         (username, hashed_password.decode('utf-8'), profile_pic))
             conn.commit()
         return True
     except sqlite3.IntegrityError:
         return False
 
+def login(username, password):
+    with conn:
+        user = conn.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
+        if user and bcrypt.checkpw(password.encode('utf-8'), user[1].encode('utf-8')):
+            st.session_state['username'] = username
+            st.session_state['profile_pic'] = user[2] if user[2] else "/Users/aaditya/Desktop/ML_Project copy/a.webp"
+            return True
+    return False
+    
 # Display trainer card
 def display_trainer_card():
-    st.sidebar.image(st.session_state['profile_pic'], use_column_width=True)
+    st.sidebar.image(st.session_state['profile_pic'], use_container_width=True)
     st.sidebar.title(f"{st.session_state['username'].capitalize()} - Sentiment Analyst")
 
 # Load data with caching to avoid reloading
